@@ -8,6 +8,7 @@ require 'veritable'
 require 'data_mapper'
 require_relative 'seed' # store seed data as a ruby hash
 
+puts "Setting up database..."
 DataMapper.setup(:default, ENV['DATABASE_URL'] || 'postgres://localhost/mydb')
 
 class Task
@@ -35,6 +36,7 @@ schema = Veritable::Schema.new({
   'true_time' => {'type' => 'count'},
   'user_estimate' => {'type' => 'count'} 
 })
+puts "Loading and normalizing records..."
 records = SEED_DATA
 Veritable::Util.clean_data(records, schema) # normalize the data
 
@@ -42,6 +44,7 @@ api = Veritable.connect
 api.tables.each {|t| t.delete} # remove existing tables, if any
 t = api.create_table('veritabill')
 
+puts "Uploading records to database and Veritable..."
 records.each {|r|
   Task.create({ # add to postgres
     :user => r['user'],
@@ -55,9 +58,11 @@ records.each {|r|
   t.upload_row(r) # upload to veritable
 }
 
+puts "Waiting for Veritable analysis...."
 a = t.create_analysis(schema, 'veritabill_0')
 a.wait
 
+puts "Estimating times..."
 Task.all.each {|r|
   h = r.attributes
   h.update({:true_time => nil})
